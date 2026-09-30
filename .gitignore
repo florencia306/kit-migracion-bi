@@ -1,0 +1,19 @@
+# Datos reales: nunca al repo
+*.qvd
+*.qvw
+datos-locales/*
+!datos-locales/.gitkeep
+**/origen/exports/*
+!**/origen/exports/.gitkeep
+*.hyper
+validacion/resultados/**/detalle_*.csv
+# Caché de Power BI
+**/.pbi/cache.abf
+**/.pbi/localSettings.json
+
+# Exports de Azure DevOps (pueden tener datos internos)
+gestion/*.csv
+# Carpeta de QlikView del tablero (qvw, qvd, scripts con conexiones): solo local
+tableros/*/qlik/
+tableros/*/origen/script.qvs
+tableros/*/origen/scripts/

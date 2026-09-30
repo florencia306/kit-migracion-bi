@@ -1,0 +1,24 @@
+# Configuración del agente de avance.
+azdo:
+  organizacion: completar
+  proyecto: completar
+  area: 'Proyecto\Equipo'          # ruta de área que contiene la migración
+  tipos: ["Epic", "Feature", "User Story", "Product Backlog Item", "Task", "Bug"]
+
+# Estados de Azure DevOps agrupados.
+estados:
+  cerrado: ["Closed", "Done", "Resolved", "Cerrado", "Hecho", "Resuelto"]
+  en_curso: ["Active", "Committed", "In Progress", "Activo", "Confirmado", "En curso"]
+  # cualquier otro estado cuenta como pendiente (New, To Do, Nuevo...)
+
+# Tipo de trabajo según tags (prioridad) o palabras del título.
+tipos_trabajo:
+  migracion:     { tags: ["migracion", "migración"], palabras: ["migra", "qlik"] }
+  alcance-nuevo: { tags: ["alcance-nuevo", "nuevo"], palabras: ["nuevo requerimiento", "nueva funcionalidad", "nuevo reporte", "agregar", "incorporar"] }
+  deuda-tecnica: { tags: ["deuda-tecnica", "deuda"], palabras: ["deuda", "refactor", "reacomod", "optimiz", "reorganiz"] }
+
+# Etapas estándar de un tablero (se buscan en el título de las Tasks de la US).
+etapas: ["Modelo", "Medidas", "Visuales", "Validación", "UAT"]
+
+# Proyección: semanas de historia para calcular la velocidad.
+semanas_velocidad: 8

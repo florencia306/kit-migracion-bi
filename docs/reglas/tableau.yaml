@@ -1,0 +1,29 @@
+# Reglas del origen Tableau (PLANTILLA): completar al empezar una migración desde Tableau.
+# Mismo formato que qlik.yaml. En Tableau, "hojas" son las fuentes de datos del libro.
+cortes:
+- id: ytd
+  nombre: Acumulado del año
+  origen: "DATETRUNC('year') / YEAR(...) = YEAR(TODAY())"
+  patron: "(?i)datetrunc\\('year'|year\\(.*\\)\\s*=\\s*year\\(today"
+  destino: Medidas YTD sobre la tabla de fechas
+- id: ly
+  nombre: Año anterior
+  origen: "DATEADD('year', -1, ...)"
+  patron: "(?i)dateadd\\('year',\\s*-1"
+  destino: Medidas LY / SPLY
+- id: lod
+  nombre: Nivel de detalle (LOD)
+  origen: "{FIXED ...} / {INCLUDE ...} / {EXCLUDE ...}"
+  patron: "(?i)\\{\\s*(fixed|include|exclude)"
+  destino: CALCULATE con ALLEXCEPT / REMOVEFILTERS o agregación en SQL
+sin_corte:
+  id: sin
+  nombre: Sin corte temporal
+  origen: —
+  destino: Contexto del visual
+reglas:
+- id: ejemplo
+  area: Ejemplo
+  metrica: Reemplazar por métricas reales
+  patrones: ["(?i)COUNTD\\("]
+  medidas_destino: []

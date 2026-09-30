@@ -1,0 +1,516 @@
+# Reglas del origen QlikView (migración Qlik → Power BI): agrupan expresiones en métricas de negocio.
+# Las usa scripts/catalogo.py cuando migracion.yaml dice origen: qlik. Se evalúan en orden: gana la primera regla que coincide.
+# - patrones: lista de expresiones regulares; TODAS tienen que coincidir.
+#   Una misma métrica (id) puede tener varias reglas con patrones distintos.
+# - objeto: (opcional) expresión regular sobre el nombre del objeto que contiene la expresión.
+# - solo_hojas: aplica la regla solo si la expresión aparece únicamente en esas hojas.
+# - medidas_destino: medidas equivalentes en el modelo. Si ninguna existe en el TMDL -> "Sin medida en el destino".
+# - estado: fuera (hoja sin página en el destino) | tecnico (etiquetas, recargas, cálculos del visual).
+# - cortes: variables temporales del origen (origen) y cómo se resuelven en el destino (destino).
+# - revision (alta/media/baja) y observacion: lo que hay que revisar. El agente puede agregar o ajustar.
+cortes:
+- id: ytd
+  nombre: Acumulado del año
+  origen: sRangoYTD, vRangoYTDIni
+  patron: sRangoYTD|vRangoYTDIni
+  destino: Medidas YTD (DATESYTD) sobre 'Calendar'
+- id: ly
+  nombre: Año anterior
+  origen: vPeriodoAñoAnterior
+  patron: vPeriodoAñoAnterior
+  destino: Medidas LY / SPLY (SAMEPERIODLASTYEAR)
+- id: pm
+  nombre: Mes anterior
+  origen: vPeriodoAnterior
+  patron: vPeriodoAnterior\b
+  destino: Medidas PM (DATEADD -1 mes)
+- id: evol
+  nombre: Evolución (1, 2 o 4 años)
+  origen: sRangoDosAños, sRangoAnalisis…
+  patron: sRango(DosAños|CuatroAños|UnAño|Anual|Analisis|DoceMeses)|vRango(Anual|Analisis)Ini
+  destino: Eje 'Calendar'[YearMonth] o [Year] + filtro relativo
+- id: stock
+  nombre: Stock a una fecha
+  origen: desde ≤ período y hasta > período
+  patron: '[<]=?\$\(vPeriodoReporte\).*[>]=?\$\(vPeriodoReporte\)|if\(\[Periodo Vigencia \w+\.\]<=?Periodo'
+  destino: Acumulado FILTER(ALL('Calendar'), Date <= MAX)
+- id: mes
+  nombre: Período de reporte
+  origen: vPeriodoReporte
+  patron: vPeriodoReporte
+  destino: Segmentador de 'Calendar' (año y mes), misma medida
+sin_corte:
+  id: sin
+  nombre: Sin corte temporal
+  origen: —
+  destino: Contexto del visual
+reglas:
+- id: iqa
+  area: Persistencia
+  metrica: IQA 12 / 24 (persistencia)
+  solo_hojas: [Persistencia]
+  objeto: (?i)\bIQA
+  patrones: ['(?i)count|sum']
+  medidas_destino: ['IQA 12 (%)', 'IQA 24 (%)']
+- id: iqa
+  area: Persistencia
+  metrica: IQA 12 / 24 (persistencia)
+  solo_hojas:
+  - Persistencia
+  patrones:
+  - (?i)IQA|#12|#24
+  medidas_destino:
+  - IQA 12 (%)
+  - IQA 24 (%)
+  revision: media
+  observacion: 'Ventanas móviles de 12/24 meses: en Qlik con AddMonths sobre vPeriodoReporte; en Power BI con _Corte_12M/_Corte_24M. Validar el mes de corte.'
+- id: cosecha
+  area: Persistencia
+  metrica: Cosechas (persistencia por cohorte)
+  solo_hojas:
+  - Persistencia
+  patrones:
+  - (?i)cosecha|Cohorte|_Mes\d|P12|P24|Mes Vida|MesVida
+  medidas_destino:
+  - '% Cosecha 12'
+  - '% Cosecha 24'
+  - Vigentes Cohorte 12 (Cosechas)
+  - Vigentes Cohorte 24 (Cosechas)
+  - Evolucion_%
+  revision: media
+  observacion: 'Cohortes calculadas con Aggr en Qlik. Sin equivalente directo: validar por cohorte y mes de vida.'
+- id: etiqueta
+  area: Técnico
+  metrica: Títulos y etiquetas dinámicas de período
+  patrones:
+  - ^date\(|AddMonths\(vPeriodoReporte
+  estado: tecnico
+- id: calc_col
+  area: Técnico
+  metrica: Cálculos entre columnas del gráfico
+  patrones:
+  - ^Column\(\d\)
+  estado: tecnico
+- id: resc
+  area: Gestiones
+  metrica: Rescates pagados (cantidad y montos)
+  patrones:
+  - Resc\.
+  revision: media
+  observacion: Sin medida en Power BI (rescates pagados en cantidad y montos por moneda).
+- id: ejecutivos
+  area: Técnico
+  metrica: Conteo de ejecutivos / legajos
+  patrones:
+  - ^Count\(DISTINCT ?\[?Legajo
+  estado: tecnico
+- id: planeada
+  area: Sometidas
+  metrica: Prima planeada (target vs planeada)
+  patrones:
+  - Planeada
+  revision: baja
+  observacion: Sin medida en Power BI; confirmar uso.
+- id: pol_stock
+  area: Cartera
+  metrica: Stock de pólizas a fecha
+  patrones:
+  - if\(\[Periodo Vigencia Pol\.\]<=?Periodo and \[Periodo Vigencia Hasta Pol\.\]
+  medidas_destino:
+  - '# Polizas Stock Inicial'
+  - '# Polizas Stock Final'
+  revision: alta
+  observacion: Qlik calcula el stock por vigencia (desde ≤ período y hasta > período) y usa 4 variantes de borde (< / ≤, > / ≥). Power BI lo calcula como emitidas acumuladas − bajas acumuladas por fecha
+    de baja de sistema. Pueden diferir cuando la vigencia hasta no coincide con la baja de sistema.
+- id: pol_dif
+  area: Cartera
+  metrica: Diferencia altas − bajas (cálculo sobre otras expresiones)
+  patrones:
+  - '#\.Emitidos (FY|MY|YTD)\] - \['
+  medidas_destino:
+  - '# Polizas Dif (Altas-Bajas)'
+  - '# Certificados Dif (Altas-Bajas)'
+- id: pol_bajas_venc
+  area: Cartera
+  metrica: Pólizas bajas por vencimiento (vigencia hasta)
+  patrones:
+  - Vigencia Hasta Pol\.\] ?= ?\{
+  - No Vigente
+  medidas_destino:
+  - Polizas Bajas del Periodo
+  revision: media
+  observacion: Qlik (hoja Queries) cuenta bajas por fecha de vigencia hasta; la medida de Power BI existe pero no se usa en ningún visual. Confirmar si este corte sigue vigente.
+- id: pol_bajas_venc
+  area: Cartera
+  metrica: Pólizas bajas por vencimiento (vigencia hasta)
+  patrones:
+  - Vigencia Hasta Pol\.\] = \{\">=
+  medidas_destino:
+  - Polizas Bajas del Periodo
+- id: pol_bv
+  area: Cartera
+  metrica: '% Bajas / Stock (pólizas)'
+  patrones:
+  - Baja Sistema Pol
+  - /
+  - Vigencia Hasta Pol
+  medidas_destino:
+  - '% Polizas B/V'
+  revision: media
+  observacion: En Power BI la tasa solo se muestra con filtro de año o fecha (ISFILTERED). En Qlik siempre tiene valor por vPeriodoReporte.
+- id: pol_dif
+  area: Cartera
+  metrica: Diferencia altas − bajas (pólizas)
+  patrones:
+  - Vigencia Pol\.\]=\{
+  - \)\s*-\s*Count
+  - Baja Sistema Pol
+  medidas_destino:
+  - '# Polizas Dif (Altas-Bajas)'
+- id: pol_bajas
+  area: Cartera
+  metrica: Pólizas bajas
+  patrones:
+  - Baja Sistema Pol
+  - No Vigente
+  medidas_destino:
+  - '# Polizas Bajas'
+  - '# Polizas Bajas SPLY'
+  revision: baja
+  observacion: Misma lógica en ambos (fecha de baja de sistema + estado No Vigente). Validar solo el borde del período.
+- id: pol_stock
+  area: Cartera
+  metrica: Stock de pólizas a fecha
+  patrones:
+  - Vigencia Pol\.\]\s*=\s*\{\"?'?<
+  - Vigencia Hasta Pol
+  medidas_destino:
+  - '# Polizas Stock Inicial'
+  - '# Polizas Stock Final'
+  - '# Polizas Vigentes'
+- id: pol_emit
+  area: Cartera
+  metrica: Pólizas emitidas
+  patrones:
+  - Vigencia Pol\.\]\*?=
+  - PolizaId
+  medidas_destino:
+  - '# Polizas Emitidas'
+  - '# Polizas Emitidas SPLY'
+  revision: media
+  observacion: Qlik usa Count(PolizaId) sin DISTINCT en varias expresiones; Power BI usa DISTINCTCOUNT. Si una póliza tiene varias filas (certificados), Qlik cuenta de más.
+- id: cert_bv
+  area: Cartera
+  metrica: '% Bajas / Stock (certificados)'
+  patrones:
+  - Baja Sistema Cert
+  - /
+  - Vigencia (Hasta )?Cert
+  medidas_destino:
+  - '% Certificados B/V'
+  revision: media
+  observacion: Medida existe pero no se usa en visuales de Power BI.
+- id: cert_dif
+  area: Cartera
+  metrica: Diferencia altas − bajas (certificados)
+  patrones:
+  - Vigencia Cert\.\]=\{
+  - \)\s*-\s*Count
+  - Baja Sistema Cert
+  medidas_destino:
+  - '# Certificados Dif (Altas-Bajas)'
+  revision: baja
+  observacion: Medida existe; validar contra Qlik.
+- id: cert_bajas
+  area: Cartera
+  metrica: Certificados bajas
+  patrones:
+  - Baja Sistema Cert
+  - CertificadoId
+  medidas_destino:
+  - '# Certificados Bajas'
+  revision: media
+  observacion: Medida en Power BI existe; verificar que la página correspondiente la use.
+- id: cert_idx
+  area: Cartera
+  metrica: Certificados indexados
+  patrones:
+  - _Indexa|_PolIdxCap
+  revision: baja
+  observacion: Sin medida en Power BI; confirmar uso.
+- id: cert_stock
+  area: Cartera
+  metrica: Stock de certificados a fecha
+  patrones:
+  - Vigencia Cert\.\]\s*=\s*\{'?\"?<
+  - Vigencia Hasta Cert
+  - CertificadoId
+  medidas_destino:
+  - '# Certificados Vigentes'
+  revision: alta
+  observacion: Mismo tema de borde de vigencia que el stock de pólizas.
+- id: asegurados
+  area: Cartera
+  metrica: Asegurados distintos (Documento)
+  patrones:
+  - Documento
+  revision: media
+  observacion: Sin medida en Power BI (asegurados distintos por documento).
+- id: nap_sinimp
+  area: Cartera
+  metrica: NAP sin impuestos
+  patrones:
+  - NAP sin/imp
+  revision: media
+  observacion: Sin medida en Power BI para NAP sin impuestos.
+- id: nap
+  area: Cartera
+  metrica: NAP
+  patrones:
+  - \bNAP\b
+  medidas_destino:
+  - $ NAP
+  revision: baja
+  observacion: Validar si '$ NAP' es con o sin impuestos.
+- id: cert_emit
+  area: Cartera
+  metrica: Certificados emitidos
+  patrones:
+  - CertificadoId
+  medidas_destino:
+  - '# Certificados Emitidos'
+  revision: alta
+  observacion: La hoja Cartera de Qlik cuenta mayormente CERTIFICADOS; la página Cartera de Power BI muestra PÓLIZAS. Confirmar con negocio qué unidad se reporta.
+- id: prima_prom
+  area: Cartera
+  metrica: Prima promedio
+  patrones:
+  - (?i)prima|Premium
+  revision: baja
+  observacion: Sin medida en Power BI; confirmar uso.
+- id: cobertura
+  area: Cartera
+  metrica: Coberturas (listas)
+  patrones:
+  - Cobertura\.|CLAU
+- id: rb_pct
+  area: Real vs Budget
+  metrica: '% cumplimiento Real / Budget'
+  patrones:
+  - _RB\.
+  - vTipoBudget
+  - /
+  medidas_destino:
+  - '% Budget Mes'
+  - '% Budget YTD'
+  - '% Budget Polizas Mes'
+  - '% Cumplimiento NBS'
+  - '% Cumplimiento Polizas'
+  revision: baja
+  observacion: Qlik resuelve Mes/YTD con ValueList en una sola expresión; Power BI tiene medidas separadas Mes y YTD.
+- id: rb_endoso
+  area: Real vs Budget
+  metrica: Endosos y aportes
+  patrones:
+  - _RB\.TipoNBS=\{'Aporte', 'Endoso'\}
+  medidas_destino:
+  - Endosos
+- id: rb_api
+  area: Real vs Budget
+  metrica: API
+  patrones:
+  - _RB\.Linea=\{'API'\}
+  medidas_destino:
+  - API
+- id: rb_budget
+  area: Real vs Budget
+  metrica: Budget (NBS y pólizas)
+  patrones:
+  - _RB\.
+  - vTipoBudget
+  medidas_destino:
+  - NBS Budget
+  - NBS Budget Mes
+  - NBS Budget YTD
+  - Polizas Budget
+  - Polizas Budget Mes
+  - Polizas Budget YTD
+  - Saldo Mes
+  - Saldo YTD
+  revision: media
+  observacion: Qlik alterna Budget/Forecast con la variable vTipoBudget. Confirmar que Power BI tenga el mismo selector.
+- id: rb_ly
+  area: Real vs Budget
+  metrica: NBS año anterior / variación
+  patrones:
+  - _RB\.
+  - vAñoReporte-1|vPeriodoAñoAnterior|YTD 24/23
+  medidas_destino:
+  - NBS Mes LY
+  - NBS YTD LY
+  - '% vs LY'
+  - '% vs YTD LY'
+  - $ NBS SPLY
+  - '% NBS vs LY'
+  revision: baja
+  observacion: Qlik usa vAñoReporte−1; Power BI usa medidas LY/SPLY sobre Calendar.
+- id: rb_ventas
+  area: Real vs Budget
+  metrica: '# Pólizas vendidas (real)'
+  patrones:
+  - _RB\.#Ventas
+  medidas_destino:
+  - Polizas Real
+  - Polizas Mes
+  - Polizas YTD
+  revision: baja
+  observacion: Filtro Gerencia = 'Individual' fijo en Qlik; en Power BI lo da el alcance del modelo.
+- id: rb_nbs
+  area: Real vs Budget
+  metrica: NBS real
+  patrones:
+  - _RB\.NBS|_NBS
+  medidas_destino:
+  - NBS Real
+  - NBS Mes
+  - NBS YTD
+  - NBS
+  - Total NBS (NBS + End + API)
+  revision: media
+  observacion: Qlik tiene variantes NBS total y NBS nueva venta (sin Aporte/Endoso ni API). En Power BI 'NBS Real' excluye Aporte, Endoso y API; el total está en 'Total NBS (NBS + End + API)'. Comparar
+    cada variante con su medida.
+- id: som_arch
+  area: Sometidas
+  metrica: Solicitudes archivadas
+  patrones:
+  - Archivada
+  medidas_destino:
+  - SOM - Archivadas
+  - SOM - % Archivadas
+- id: som_susc
+  area: Sometidas
+  metrica: Solicitudes en suscripción
+  patrones:
+  - (?i)suscrip|Pendiente
+  medidas_destino:
+  - SOM - En Suscripcion
+  - SOM - % En Suscripción
+  revision: media
+  observacion: Qlik define 'en suscripción' como stock a fecha (sometida ≤ período y aún no emitida/archivada). Validar que la medida de Power BI use el mismo criterio de corte.
+- id: som_emit
+  area: Sometidas
+  metrica: Sometidas emitidas (Towers)
+  patrones:
+  - Towers|_PolizaEmitida
+  medidas_destino:
+  - SOM - Emitidas (Vigencia)
+  - SOM - % Emitidas
+  revision: alta
+  observacion: Qlik cuenta emitidas por período de VIGENCIA de la póliza; 'SOM - Emitidas (Vigencia)' en Power BI usa la relación con FECHA DE SOMETIMIENTO. Posible desvío por corte temporal.
+- id: som_tat
+  area: Sometidas
+  metrica: Tiempo de emisión (TAT)
+  patrones:
+  - (?i)networkdays|TAT|Fecha Sometimiento.*-
+  medidas_destino:
+  - SOM - TAT Prom (hábiles)
+- id: som_total
+  area: Sometidas
+  metrica: Solicitudes sometidas
+  patrones:
+  - Solicitud
+  medidas_destino:
+  - SOM - Total
+  - SOM - Total LY
+  revision: baja
+  observacion: Validar relación de fecha de sometimiento.
+- id: prod
+  area: Productores
+  metrica: Productores activos / inactivos
+  patrones:
+  - (?i)Productor
+  medidas_destino:
+  - Prod Universo
+  - Prod Activos
+  - Prod Inactivos
+  - Prod PA
+  - '% Activos'
+  - '% PA'
+  revision: baja
+  observacion: Qlik filtra canal 'Br. Pequeño' y productores sin ejecutivo asignado; confirmar filtros en Power BI.
+- id: gest_huerf
+  area: Gestiones
+  metrica: Gestiones huérfanas
+  patrones:
+  - (?i)hu[eé]rfan|_Huerf|Evento
+  revision: baja
+  observacion: Sin medida en Power BI; confirmar si se sigue usando.
+- id: gest_usd
+  area: Gestiones
+  metrica: Montos de gestiones (USD)
+  patrones:
+  - ValorUSD
+  revision: media
+  observacion: Sin medida en Power BI (montos de gestiones en USD).
+- id: gest
+  area: Gestiones
+  metrica: Gestiones (quejas, retiros, rescates)
+  patrones:
+  - (?i)Gestion
+  medidas_destino:
+  - '# Gestiones'
+  - '# Gestiones LY'
+  - '% Gestiones vs LY'
+  - '# Gestiones Queja'
+  - '# Gestiones Retiro Parcial Poliza'
+  revision: media
+  observacion: Qlik incluye RESCATE DE POLIZA y AUMENTO DE PRIMA/CAPITAL; Power BI solo tiene medidas de Queja y Retiro parcial.
+- id: som_emit
+  area: Sometidas
+  metrica: Sometidas emitidas (Towers)
+  patrones:
+  - Vigencia Cert\.\]\*=\{\$\(sRangoUnAño
+  medidas_destino:
+  - SOM - Emitidas (Vigencia)
+  - SOM - % Emitidas
+- id: rb_ventas
+  area: Real vs Budget
+  metrica: '# Pólizas vendidas (real)'
+  patrones:
+  - _RB\.(TipoNBS|Gerencia)
+  medidas_destino:
+  - Polizas Real
+  - Polizas Mes
+  - Polizas YTD
+- id: pol_emit
+  area: Cartera
+  metrica: Pólizas emitidas
+  patrones:
+  - PolizaId
+  medidas_destino:
+  - '# Polizas Emitidas'
+  - '# Polizas Emitidas SPLY'
+- id: act
+  area: Actividad comercial
+  metrica: Actividad de ejecutivos (visitas, ausencias)
+  patrones:
+  - Actividad\.
+  estado: fuera
+- id: leads
+  area: Leads
+  metrica: Leads
+  patrones:
+  - Leads\.
+  estado: fuera
+- id: factcob
+  area: Facturación y cobranza
+  metrica: Facturación y cobranza
+  patrones:
+  - Recibo\.|Factura\.
+  estado: fuera
+- id: reload
+  area: Técnico
+  metrica: Control de recarga (Reload/TEMP)
+  patrones:
+  - _File\.|Store|Tabla_Archivos
+  estado: tecnico

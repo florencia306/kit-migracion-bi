@@ -1,0 +1,3 @@
+# Configuración de la migración. Los scripts toman de acá el origen y el destino por defecto.
+origen: qlik        # conectores/origen/<origen>.py  y reglas en docs/reglas/<origen>.yaml
+destino: powerbi    # conectores/destino/<destino>.py

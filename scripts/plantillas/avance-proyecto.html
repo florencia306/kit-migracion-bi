@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avance de la migración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: tablero de avance — KPIs + proyección arriba, migración vs alcance nuevo, detalle por gerencia/tablero, pendientes abajo */
+:root{
+  --bg:#f4f6f5; --surface:#fff; --fg:#17212b; --muted:#5b6770; --line:#d9e0e0;
+  --accent:#0f6b6b; --accent-soft:#e0efee;
+  --ok:#2e7d4f; --ok-bg:#e3f2e8; --warn:#a86a00; --warn-bg:#fbefd8; --bad:#b3372f; --bad-bg:#f8e1de;
+  --info:#2c5d9e; --info-bg:#e2ebf7; --neutral:#6b7378; --neutral-bg:#eceeef;
+  --f-display:"Archivo","Arial Narrow",Arial,sans-serif; --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11181c; --surface:#172127; --fg:#e6ecee; --muted:#9aa7ae; --line:#2a363d; --accent:#4fb3ad; --accent-soft:#1c3336;
+  --ok:#6fcf97; --ok-bg:#16301f; --warn:#e8b04b; --warn-bg:#35290f; --bad:#ef7d72; --bad-bg:#3a1c19;
+  --info:#7fb0ef; --info-bg:#18263a; --neutral:#a3acb1; --neutral-bg:#232d33; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11181c; --surface:#172127; --fg:#e6ecee; --muted:#9aa7ae; --line:#2a363d; --accent:#4fb3ad; --accent-soft:#1c3336;
+  --ok:#6fcf97; --ok-bg:#16301f; --warn:#e8b04b; --warn-bg:#35290f; --bad:#ef7d72; --bad-bg:#3a1c19;
+  --info:#7fb0ef; --info-bg:#18263a; --neutral:#a3acb1; --neutral-bg:#232d33; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;display:grid;gap:24px}
+h1,h2{font-family:var(--f-display);margin:0;text-wrap:balance}
+h1{font-size:2rem;font-weight:800}
+h2{font-size:1.2rem;font-weight:700}
+.eyebrow{font-family:var(--f-display);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.lead{color:var(--muted);margin:.3rem 0 0;max-width:75ch}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:2px}
+.tile b{font-family:var(--f-display);font-size:1.8rem;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{color:var(--muted);font-size:.85rem}
+.tile.warn{border-color:var(--warn);background:var(--warn-bg)}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:14px;min-width:0}
+.bar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--neutral-bg)}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.weeks{display:flex;align-items:flex-end;gap:6px;height:90px}
+.weeks div{flex:1;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.weeks div span{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:.75rem;color:var(--muted)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:.88rem}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-display);font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:700}
+tr.ger td{background:var(--accent-soft);font-family:var(--f-display);font-weight:700}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)} .p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-bad{background:var(--bad-bg);color:var(--bad)} .p-info{background:var(--info-bg);color:var(--info)}
+.p-neutral{background:var(--neutral-bg);color:var(--neutral)} .p-none{border:1px dashed var(--line);color:var(--muted)}
+.etapas{display:flex;gap:4px;flex-wrap:wrap}
+.mini{width:120px}
+details summary{cursor:pointer;color:var(--accent);font-weight:600}
+details ul{margin:6px 0 0;padding-left:18px;color:var(--muted)}
+.muted{color:var(--muted)}
+footer{color:var(--muted);font-size:.85rem}
+@media (max-width:640px){.wrap{padding:20px 16px 40px}h1{font-size:1.6rem}}
+</style></head>
+<body><div class="wrap">
+<header>
+  <div class="eyebrow">Avance del proyecto</div>
+  <h1>Migración de tableros</h1>
+  <p class="lead" id="lead"></p>
+</header>
+<div class="tiles" id="tiles"></div>
+
+<section class="card">
+  <h2>Migración vs trabajo fuera del alcance</h2>
+  <div class="bar" id="barTipo" role="img"></div>
+  <div class="legend" id="legTipo"></div>
+</section>
+
+<section class="card" id="proyCard">
+  <h2>Velocidad de migración (últimas semanas)</h2>
+  <div class="weeks" id="weeks"></div>
+  <p class="muted" id="proyTxt"></p>
+</section>
+
+<section class="card">
+  <div class="toolbar"><h2 style="margin-right:auto">Por gerencia y tablero</h2>
+    <label>Gerencia <select id="fGer"><option value="">Todas</option></select></label></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Tablero</th><th>US migración</th><th>Avance</th><th>Etapas</th><th class="num">Objetos migrados</th><th class="num">Métricas validadas</th><th>Fuera de alcance</th></tr></thead>
+    <tbody id="tb"></tbody></table></div>
+</section>
+
+<section class="card" id="sinTab">
+  <h2>US sin tablero asignado</h2>
+  <p class="muted">Revisar en <code>pendientes.csv</code> y confirmar en <code>gestion/asignaciones.yaml</code>.</p>
+  <div class="tablewrap"><table style="min-width:600px"><thead><tr><th>ID</th><th>Título</th><th>Tipo</th><th>Estado</th></tr></thead><tbody id="tbSin"></tbody></table></div>
+</section>
+<footer id="foot"></footer>
+</div>
+<script>
+const D = __DATA__;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const f0 = n => (Math.round((n || 0) * 10) / 10).toLocaleString("es-AR");
+const TIPOS = {"migracion":["Migración","var(--accent)"],"alcance-nuevo":["Alcance nuevo","var(--info)"],
+  "deuda-tecnica":["Deuda técnica","var(--warn)"],"sin clasificar":["Sin clasificar","var(--neutral)"]};
+const dm = s => { const [y, m, d] = s.split("-"); return `${d}/${m}/${y.slice(2)}`; };
+const tipoN = k => (TIPOS[k] || [k])[0];
+
+const T = D.totales || {}, M = T.migracion || {total:0, cerrado:0, us:0}, P = D.proyeccion || {}, C = D.calidad || {};
+const totalAll = Object.values(T).reduce((s, v) => s + v.total, 0);
+const fuera = totalAll - M.total;
+$("lead").textContent = `Datos de Azure DevOps cruzados con los resultados del kit. Unidad: ${D.unidad}. Generado ${D.generado}.`;
+
+const kitSum = k => D.tableros.reduce((s, t) => s + (t.kit[k] || 0), 0);
+const tiles = [
+  [pct(M.cerrado, M.total) + "%", `migración cerrada (${f0(M.cerrado)}/${f0(M.total)})`],
+  [f0(P.restante ?? (M.total - M.cerrado)), "restante de migración"],
+  [P.semanas_min != null ? `${dm(P.fin_min)} – ${dm(P.fin_max)}` : "—", P.semanas_min != null ? "fin estimado de la migración (rango)" : "sin velocidad para proyectar"],
+  [kitSum("objetos_en_alcance") ? pct(kitSum("objetos_migrados"), kitSum("objetos_en_alcance")) + "%" : "—", "objetos Qlik migrados (kit)"],
+  [pct(fuera, totalAll) + "%", "del trabajo es fuera del alcance"],
+  [C.pendientes, "work items por confirmar", C.pendientes ? "warn" : ""],
+];
+$("tiles").innerHTML = tiles.map(([b, s, c]) => `<div class="tile ${c || ""}"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+
+// barra por tipo
+const orden = Object.keys(T).sort((a, b) => (a === "migracion" ? -1 : b === "migracion" ? 1 : T[b].total - T[a].total));
+$("barTipo").innerHTML = orden.map(k => `<i style="width:${totalAll ? T[k].total / totalAll * 100 : 0}%;background:${(TIPOS[k]||[,"var(--neutral)"])[1]}" title="${esc(tipoN(k))}"></i>`).join("");
+$("barTipo").setAttribute("aria-label", orden.map(k => `${tipoN(k)} ${pct(T[k].total, totalAll)}%`).join(", "));
+$("legTipo").innerHTML = orden.map(k => `<span><i class="dot" style="background:${(TIPOS[k]||[,"var(--neutral)"])[1]}"></i>${esc(tipoN(k))}: ${f0(T[k].total)} (${T[k].us} US, ${pct(T[k].cerrado, T[k].total)}% cerrado)</span>`).join("");
+
+// velocidad
+const ps = P.por_semana || [];
+if (ps.length) {
+  const mx = Math.max(...ps, 1);
+  $("weeks").innerHTML = ps.map((v, i) => `<div style="height:${v / mx * 100}%" title="Semana ${i + 1}: ${f0(v)}"><span>${v ? f0(v) : ""}</span></div>`).join("");
+  $("proyTxt").textContent = `Velocidad media ${f0(P.velocidad_semanal)}/semana. Restan ${f0(P.restante)} → fin entre ${P.fin_min} y ${P.fin_max} (${P.semanas_min}–${P.semanas_max} semanas). Solo cuenta trabajo de migración.`;
+} else { $("weeks").style.display = "none"; $("proyTxt").textContent = "Sin cierres de migración en el período: no se puede proyectar."; }
+
+// tabla por gerencia
+const gers = D.gerencias || {};
+Object.entries(gers).forEach(([id, n]) => $("fGer").insertAdjacentHTML("beforeend", `<option value="${esc(id)}">${esc(n)}</option>`));
+const ETQ = {"cerrada":"p-ok","en curso":"p-info","pendiente":"p-neutral","sin tasks":"p-none"};
+function fila(t) {
+  const m = t.por_tipo.migracion || {total:0, cerrado:0, us:0};
+  const otros = Object.entries(t.por_tipo).filter(([k]) => k !== "migracion");
+  const av = pct(m.cerrado, m.total);
+  const k = t.kit || {};
+  const et = Object.entries(t.etapas).map(([e, s]) => `<span class="pill ${ETQ[s]}" title="${esc(s)}">${esc(e)}</span>`).join("");
+  const us = t.us.map(u => `<li>#${u.id} ${esc(u.titulo)} — ${esc(u.estado)} (${esc(tipoN(u.tipo || "sin clasificar"))})</li>`).join("");
+  return `<tr><td><b>${esc(t.nombre)}</b><br><span class="muted">${esc(t.id)}</span>${us ? `<details><summary>${t.us.length} US</summary><ul>${us}</ul></details>` : `<br><span class="pill p-warn">sin US en AzDO</span>`}</td>
+    <td class="num">${m.us}</td>
+    <td><div class="bar mini"><i style="width:${av}%;background:var(--ok)"></i></div><span class="muted">${av}% · ${f0(m.cerrado)}/${f0(m.total)}</span></td>
+    <td><div class="etapas">${et}</div></td>
+    <td class="num">${k.objetos_en_alcance ? `${k.objetos_migrados}/${k.objetos_en_alcance}` : "—"}${k.visuales_sin_origen ? `<br><span class="pill p-info">${k.visuales_sin_origen} visual(es) nuevos</span>` : ""}</td>
+    <td class="num">${k.metricas_migradas ? (k.metricas_validadas != null ? `${k.metricas_validadas}/${k.metricas_migradas}` : `<span class="muted">sin validar (${k.metricas_migradas})</span>`) : "—"}${k.casos_con_diferencia ? `<br><span class="pill p-bad">${k.casos_con_diferencia} con diferencia</span>` : ""}</td>
+    <td>${otros.length ? otros.map(([k2, v]) => `<span class="pill p-info">${esc(tipoN(k2))}: ${v.us}</span>`).join(" ") : `<span class="muted">—</span>`}</td></tr>`;
+}
+function render() {
+  const g = $("fGer").value;
+  const grupos = {};
+  D.tableros.filter(t => !g || t.gerencia === g).forEach(t => (grupos[t.gerencia || "—"] ||= []).push(t));
+  $("tb").innerHTML = Object.entries(grupos).map(([gid, ts]) =>
+    `<tr class="ger"><td colspan="7">${esc(gers[gid] || gid)} · ${ts.length} tablero(s)</td></tr>` + ts.map(fila).join("")).join("")
+    || `<tr><td colspan="7" class="muted">Sin tableros.</td></tr>`;
+}
+$("fGer").addEventListener("change", render); render();
+
+const sin = D.sin_tablero || [];
+if (!sin.length) $("sinTab").style.display = "none";
+$("tbSin").innerHTML = sin.slice(0, 200).map(u => `<tr><td>#${u.id}</td><td>${esc(u.titulo)}</td><td>${esc(tipoN(u.tipo || "sin clasificar"))}</td><td>${esc(u.estado)}</td></tr>`).join("");
+$("foot").textContent = `${C.us} US · ${C.asignadas_auto} asignadas automáticamente · ${C.pendientes} por confirmar. Solo lectura: nada de esto modifica Azure DevOps.`;
+</script>
+</body></html>

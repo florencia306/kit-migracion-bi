@@ -1,0 +1,26 @@
+# Catálogo de tableros de la migración. Lo usan el agente de avance y los reportes.
+# - id: identificador fijo (nombre de la carpeta en tableros/). No cambia aunque cambien los nombres.
+# - azdo_us: ID de la US del tablero en Azure DevOps (vínculo exacto, recomendado).
+# - alias: otras formas en que aparece el tablero en títulos de US o conversaciones.
+gerencias:
+  - id: individual
+    nombre: Gerencia Individual
+    azdo_feature: null        # ID de la Feature de la gerencia (completar)
+    alias: ["Individual", "Gcia Individual"]
+
+tableros:
+  # Tablero base: genera los QVD que usan los demás. Migrarlo y validarlo primero.
+  - id: cartera
+    gerencia: individual        # ajustar
+    base: true
+    qlik: "Cartera.qvw"
+    azdo_us: null
+    alias: ["Cartera", "Tablero de Cartera"]
+
+  - id: gerencia-individual
+    gerencia: individual
+    depende_de: [cartera]     # lee QVD de estos tableros
+    qlik: "Gerencia Individual.qvw"
+    powerbi: "Gerencia Individual.pbip"
+    azdo_us: null             # completar con el ID de la US
+    alias: ["Gerencia Individual", "Tablero Individual", "GI"]

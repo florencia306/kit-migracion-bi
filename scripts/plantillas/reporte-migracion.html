@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITULO__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: tablero de control de migración — resumen arriba, cortes temporales, catálogo filtrable abajo */
+:root{
+  --bg:#f4f6f5; --surface:#ffffff; --fg:#17212b; --muted:#5b6770; --line:#d9e0e0;
+  --accent:#0f6b6b; --accent-soft:#e0efee;
+  --ok:#2e7d4f; --ok-bg:#e3f2e8; --warn:#a86a00; --warn-bg:#fbefd8; --bad:#b3372f; --bad-bg:#f8e1de;
+  --info:#2c5d9e; --info-bg:#e2ebf7; --neutral:#6b7378; --neutral-bg:#eceeef;
+  --f-display:"Archivo","Arial Narrow",Arial,sans-serif; --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif; --f-mono:"JetBrains Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11181c; --surface:#172127; --fg:#e6ecee; --muted:#9aa7ae; --line:#2a363d;
+  --accent:#4fb3ad; --accent-soft:#1c3336;
+  --ok:#6fcf97; --ok-bg:#16301f; --warn:#e8b04b; --warn-bg:#35290f; --bad:#ef7d72; --bad-bg:#3a1c19;
+  --info:#7fb0ef; --info-bg:#18263a; --neutral:#a3acb1; --neutral-bg:#232d33; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11181c; --surface:#172127; --fg:#e6ecee; --muted:#9aa7ae; --line:#2a363d;
+  --accent:#4fb3ad; --accent-soft:#1c3336;
+  --ok:#6fcf97; --ok-bg:#16301f; --warn:#e8b04b; --warn-bg:#35290f; --bad:#ef7d72; --bad-bg:#3a1c19;
+  --info:#7fb0ef; --info-bg:#18263a; --neutral:#a3acb1; --neutral-bg:#232d33; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 60px;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:2rem;font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.25rem;font-weight:700}
+.eyebrow{font-family:var(--f-display);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.lead{color:var(--muted);max-width:70ch;margin:.4rem 0 0}
+header{display:grid;gap:6px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:2px}
+.tile b{font-family:var(--f-display);font-size:1.8rem;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{color:var(--muted);font-size:.85rem}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--neutral-bg)}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.85rem;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:14px;min-width:0}
+.cuts{display:grid;gap:10px}
+.cut{display:grid;grid-template-columns:minmax(150px,230px) 1fr 44px minmax(200px,340px);gap:14px;align-items:center}
+.cut .lbl{font-weight:600}
+.cut .lbl small{display:block;color:var(--muted);font-weight:400;font-family:var(--f-mono);font-size:.72rem}
+.cut .track{background:var(--neutral-bg);border-radius:4px;height:22px;position:relative}
+.cut .fill{background:var(--accent);height:100%;border-radius:4px}
+.cut .num{font-size:.85rem;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.cut .pbi{font-size:.85rem;color:var(--muted)}
+.cut .pbi code{font-family:var(--f-mono);font-size:.75rem;color:var(--fg);background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+.note{background:var(--accent-soft);border-radius:8px;padding:12px 14px;font-size:.92rem}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar select,.toolbar input[type=search]{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.btn{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:1060px;font-size:.88rem}
+th{font-family:var(--f-display);text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.sev-alta td:first-child{box-shadow:inset 4px 0 0 var(--bad)}
+tr.sev-media td:first-child{box-shadow:inset 4px 0 0 var(--warn)}
+tr.sev-baja td:first-child{box-shadow:inset 4px 0 0 var(--ok)}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.p-migrada{background:var(--ok-bg);color:var(--ok)} .p-sin_medida{background:var(--bad-bg);color:var(--bad)}
+.p-fuera{background:var(--info-bg);color:var(--info)} .p-tecnico{background:var(--neutral-bg);color:var(--neutral)}
+.p-alta{background:var(--bad-bg);color:var(--bad)} .p-media{background:var(--warn-bg);color:var(--warn)} .p-baja{background:var(--ok-bg);color:var(--ok)}
+.p-pend{background:var(--neutral-bg);color:var(--neutral)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:.72rem;padding:1px 6px;border-radius:4px;background:var(--neutral-bg);color:var(--muted);white-space:nowrap}
+.meas{font-family:var(--f-mono);font-size:.74rem;line-height:1.6}
+.obs{min-width:280px;max-width:46ch}
+details summary{cursor:pointer;color:var(--accent);font-size:.82rem;margin-top:6px}
+details pre{font-family:var(--f-mono);font-size:.72rem;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0 0;max-width:60ch}
+.muted{color:var(--muted)}
+.dev{font-variant-numeric:tabular-nums;font-weight:600}
+.status-line{font-size:.85rem;color:var(--muted)}
+footer{color:var(--muted);font-size:.85rem}
+.cmp-btn{font:inherit;font-size:.8rem;font-weight:600;color:var(--accent);background:var(--accent-soft);border:0;border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:8px}
+.cmp-btn[aria-expanded="true"]{background:var(--accent);color:var(--surface)}
+tr.cmp td{background:var(--bg);padding:14px}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cmp-col{min-width:0;display:grid;gap:8px;align-content:start}
+.cmp-col h3{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cmp-col pre{font-family:var(--f-mono);font-size:.74rem;white-space:pre-wrap;word-break:break-word;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;margin:0}
+.cmp-col .mname{font-family:var(--f-mono);font-size:.78rem;font-weight:600}
+.vals{font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:3px}
+@media (max-width:720px){.cmp-grid{grid-template-columns:1fr}}
+@media (max-width:720px){.cut{grid-template-columns:1fr}.cut .pbi{margin-bottom:6px}h1{font-size:1.6rem}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head><body>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Migración __ORIGEN__ → __DESTINO__ · __TABLERO__</div>
+  <h1>__TITULO__</h1>
+  <p class="lead">Catálogo de las expresiones de __ORIGEN__ agrupadas por métrica de negocio, con la medida equivalente en __DESTINO__, lo que conviene revisar y el desvío contra __ORIGEN__ según la última corrida del validador.</p>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<section class="card">
+  <div>
+    <h2>Estado del catálogo</h2>
+    <p class="muted" style="margin:.2rem 0 0">Expresiones únicas de __ORIGEN__ según el estado de su métrica en __DESTINO__.</p>
+  </div>
+  <div class="bar" id="stateBar" role="img" aria-label="Distribución de expresiones por estado"></div>
+  <div class="legend" id="stateLegend"></div>
+  <div class="note">La migración no es 1 a 1: se unificaron hojas y solo se migraron las métricas en uso. Las métricas <b>sin medida en __DESTINO__</b> no son necesariamente faltantes: primero hay que confirmar si todavía se usan.</div>
+</section>
+
+<section class="card">
+  <div>
+    <h2>Cortes temporales: del origen a la tabla de fechas del modelo</h2>
+    <p class="muted" style="margin:.2rem 0 0">En __ORIGEN__ cada corte suele ser otra expresión. En __DESTINO__ una sola medida se corta por la tabla de fechas. Cantidad de expresiones únicas de __ORIGEN__ por corte:</p>
+  </div>
+  <div class="cuts" id="cuts"></div>
+  <div class="note" id="collapse"></div>
+</section>
+
+<section class="card">
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:end">
+    <div>
+      <h2>Catálogo de métricas</h2>
+      <p class="status-line" id="devStatus"></p>
+    </div>
+  </div>
+  <div class="toolbar">
+    <label for="fArea" class="muted">Área</label><select id="fArea"></select>
+    <label for="fEstado" class="muted">Estado</label><select id="fEstado"></select>
+    <label for="fSev" class="muted">Revisión</label><select id="fSev"></select>
+    <input id="fText" type="search" placeholder="Buscar métrica o medida" aria-label="Buscar métrica o medida">
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Métrica</th><th>Estado</th><th>Medidas __DESTINO__</th><th>__ORIGEN__</th><th>Cortes en __ORIGEN__</th><th>Desvío vs __ORIGEN__</th><th>Revisar</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+const DATA = __DATA__;
+const M = DATA.metricas, S = DATA.stats, DEV = DATA.desvios || {}, CUTS = DATA.cortes_cfg;
+const EST = {migrada:"Migrada",sin_medida:"Sin medida en __DESTINO__",fuera:"Hoja sin página en __DESTINO__",tecnico:"Técnico / visual"};
+const ESTC = {migrada:"var(--ok)",sin_medida:"var(--bad)",fuera:"var(--info)",tecnico:"var(--neutral)"};
+const SEV = {alta:"Alta",media:"Media",baja:"Baja"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = v => v==null ? "—" : Number(v).toLocaleString("es-AR",{maximumFractionDigits:2});
+const code = s => esc(s).replace(/'Calendar'(\[[^\]]+\])?/g, m=>`<code>${m}</code>`);
+function tiles(){
+  const mig = M.filter(x=>x.estado==="migrada"), val = mig.filter(x=>DEV[x.id]).length;
+  const dif = mig.filter(x=>DEV[x.id] && DEV[x.id].estado!=="OK").length;
+  const t = [[S.expresiones,"expresiones exportadas de __ORIGEN__"],[S.unicas,"expresiones únicas"],[M.length,"métricas de negocio"],
+    [mig.length,"métricas con medida en __DESTINO__"],[M.filter(x=>x.revision==="alta").length,"métricas con revisión alta"],
+    [val?`${val}/${mig.length}`:"—","métricas validadas contra __ORIGEN__"],[val?dif:"—","métricas con diferencias"]];
+  $("#tiles").innerHTML = t.map(([b,sp])=>`<div class="tile"><b>${b}</b><span>${sp}</span></div>`).join("");
+}
+function stateBar(){
+  const tot = M.reduce((a,x)=>a+x.expresiones,0), by = {};
+  M.forEach(x=>by[x.estado]=(by[x.estado]||0)+x.expresiones);
+  const keys = ["migrada","sin_medida","fuera","tecnico"];
+  $("#stateBar").innerHTML = keys.map(k=>`<i style="width:${(by[k]||0)/tot*100}%;background:${ESTC[k]}" title="${EST[k]}: ${by[k]||0}"></i>`).join("");
+  $("#stateLegend").innerHTML = keys.map(k=>`<span><i class="dot" style="background:${ESTC[k]}"></i>${EST[k]}: <b>${by[k]||0}</b> (${Math.round((by[k]||0)/tot*100)} %)</span>`).join("");
+}
+function cuts(){
+  const s = S.cortes, max = Math.max(...Object.values(s));
+  $("#cuts").innerHTML = CUTS.filter(c=>s[c.nombre]).map(c=>`<div class="cut">
+    <div class="lbl">${esc(c.nombre)}<small>${esc(c.origen||"—")}</small></div>
+    <div class="track"><div class="fill" style="width:${s[c.nombre]/max*100}%"></div></div><span class="num">${s[c.nombre]}</span>
+    <div class="pbi">${code(c.destino||"")}</div></div>`).join("");
+  const mig = M.filter(x=>x.estado==="migrada"), ex = mig.reduce((a,x)=>a+x.expresiones,0), me = new Set(mig.flatMap(x=>x.medidas_destino)).size;
+  $("#collapse").innerHTML = me ? `Las <b>${ex}</b> expresiones únicas de las métricas migradas se resuelven en __DESTINO__ con <b>${me}</b> medidas: en promedio <b>${(ex/me).toFixed(1)}</b> expresiones de __ORIGEN__ por medida, porque el corte temporal lo aporta la tabla de fechas.` : "";
+}
+function fillSelect(id, vals, all){ $(id).innerHTML = `<option value="">${all}</option>` + vals.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join(""); }
+function devCell(x){
+  if (x.estado!=="migrada") return `<span class="muted">No aplica</span>`;
+  const d = DEV[x.id];
+  if (!d) return `<span class="pill p-pend">Pendiente</span>`;
+  const cls = d.estado==="OK" ? "p-baja" : (d.desvio!==null && Math.abs(d.desvio)<=1 ? "p-media" : "p-alta");
+  const txt = d.desvio===null ? d.estado : `${d.desvio>0?"+":""}${d.desvio.toFixed(2)} %`;
+  return `<span class="pill ${cls} dev" title="${esc(d.casos.join(', '))}">${txt}</span><div class="vals">__ORIGEN__ ${fmt(d.total_origen)} · __DESTINO__ ${fmt(d.total_destino)}</div><div class="muted" style="font-size:.75rem">${d.casos.length} caso(s)</div>`;
+}
+function render(){
+  const a=$("#fArea").value, e=$("#fEstado").value, sv=$("#fSev").value, q=$("#fText").value.toLowerCase();
+  const rows = M.filter(x=>(!a||x.area===a)&&(!e||x.estado===e)&&(!sv||x.revision===sv)&&(!q||(x.metrica+" "+x.medidas_destino.join(" ")).toLowerCase().includes(q)));
+  $("#rows").innerHTML = rows.map(x=>{
+    const hojas = Object.entries(x.hojas).map(([h,n])=>`<span class="chip">${esc(h)} · ${n}</span>`).join("");
+    const cortes = Object.entries(x.cortes).map(([c,n])=>`<span class="chip">${esc(c)} · ${n}</span>`).join("");
+    const obs = [x.observacion, ...x.alertas].filter(Boolean);
+    return `<tr class="${x.revision?'sev-'+x.revision:''}">
+      <td><b>${esc(x.metrica)}</b><div class="muted" style="font-size:.8rem">${esc(x.area)}</div>
+        <button class="cmp-btn" aria-expanded="false" data-id="${esc(x.id)}">Comparar __ORIGEN__ vs __DESTINO__</button></td>
+      <td><span class="pill p-${x.estado}">${EST[x.estado]||x.estado}</span></td>
+      <td class="meas">${x.medidas_destino.length?x.medidas_destino.map(esc).join("<br>"):'<span class="muted">—</span>'}</td>
+      <td class="n">${x.expresiones} expr.<div class="chips" style="justify-content:flex-end;margin-top:4px">${hojas}</div></td>
+      <td><div class="chips">${cortes}</div></td>
+      <td>${devCell(x)}</td>
+      <td class="obs">${x.revision?`<span class="pill p-${x.revision}">${SEV[x.revision]}</span> `:""}${obs.map(esc).join("<br>")||'<span class="muted">—</span>'}</td>
+    </tr>
+    <tr class="cmp" id="cmp-${esc(x.id)}" hidden><td colspan="7"><div class="cmp-grid">
+      <div class="cmp-col"><h3>__ORIGEN__ · ${x.expresiones} expresiones (hasta 3 de ejemplo)</h3>${x.ejemplos.map(z=>`<pre>${esc(z)}</pre>`).join("")}</div>
+      <div class="cmp-col"><h3>__DESTINO__ · ${esc(DATA.lenguaje_destino||"")}</h3>${x.medidas_destino.length ? x.medidas_destino.map(m=>`<div class="mname">${esc(m)}</div><pre>${esc((x.expr_destino||{})[m]||"(sin expresión en el modelo)")}</pre>`).join("") : '<pre>Sin medida equivalente en el modelo.</pre>'}</div>
+    </div></td></tr>`;}).join("") || `<tr><td colspan="7" class="muted">No hay métricas con esos filtros.</td></tr>`;
+  document.querySelectorAll(".cmp-btn").forEach(b=>b.addEventListener("click",()=>{
+    const r=document.getElementById("cmp-"+b.dataset.id), open=b.getAttribute("aria-expanded")!=="true";
+    r.hidden=!open; b.setAttribute("aria-expanded",open); b.textContent=open?"Ocultar comparación":"Comparar __ORIGEN__ vs __DESTINO__";
+  }));
+}
+$("#devStatus").textContent = DATA.validacion ? `Desvío vs __ORIGEN__ según la corrida del validador del ${DATA.validacion}. Se muestra el mayor desvío de cada métrica.` : "Desvío vs __ORIGEN__: pendiente. Corré scripts/validar.py y volvé a generar este reporte.";
+$("#foot").textContent = `Generado el ${DATA.generado} con scripts/reporte.py. Fuente: ${S.expresiones} expresiones de __ORIGEN__ (${S.hojas} hojas) y ${S.medidas_modelo} medidas del modelo de __DESTINO__. ${S.sin_clasificar} expresiones sin clasificar (ver sin-clasificar.csv).`;
+fillSelect("#fArea", [...new Set(M.map(x=>x.area))].map(v=>[v,v]), "Todas");
+fillSelect("#fEstado", Object.entries(EST), "Todos");
+fillSelect("#fSev", Object.entries(SEV), "Todas");
+["#fArea","#fEstado","#fSev"].forEach(s=>$(s).addEventListener("change",render));
+$("#fText").addEventListener("input",render);
+tiles(); stateBar(); cuts(); render();
+</script>
+</body></html>

@@ -1,0 +1,3 @@
+# Decisiones confirmadas por el equipo (tienen prioridad sobre lo automático).
+# id del work item: { tablero: <id en tableros.yaml>, gerencia: <id>, tipo: migracion | alcance-nuevo | deuda-tecnica }
+asignaciones: {}

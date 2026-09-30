@@ -1,0 +1,66 @@
+# Casos de prueba del tablero Gerencia Individual.
+# Los escribe el agente (o vos); los ejecuta scripts/validar.py.
+# Rutas de "archivo" relativas a la carpeta del tablero.
+tablero: gerencia-individual
+destino: powerbi
+
+# Referencia en vivo desde QlikView Desktop (tipo: qlik). Variables comunes a todos los casos;
+# cada caso puede sumar las suyas. Los IDs de objeto salen de origen/objetos.csv.
+qlik:
+  documento: qlik/Gerencia Individual.qvw
+  variables: { vPeriodoReporte: "202608" }
+
+casos:
+  # Tarjeta: total del período, leída del objeto de texto de Qlik
+  - id: cartera_emitidas_total
+    medida: "# Polizas Emitidas"
+    filtros: { "'Calendar'[YearMonth]": [202608] }
+    referencia: { tipo: qlik, objeto: TX01 }        # reemplazar por el ID real
+    tolerancia: 0
+
+  # Serie por año, leída del gráfico "Evolución de cartera"
+  - id: cartera_bajas_por_anio
+    medida: "# Polizas Bajas"
+    agrupar_por: ["'Calendar'[Year]"]
+    referencia:
+      tipo: qlik
+      objeto: CH01                                   # reemplazar por el ID real
+      columna: Bajas                                 # etiqueta de la expresión en Qlik
+      renombrar: { "Año": "Year" }                   # dimensión Qlik -> columna Power BI
+    tolerancia: 0
+
+  # Alternativa sin QlikView Desktop: export manual del objeto
+  # - id: cartera_bajas_por_anio_csv
+  #   medida: "# Polizas Bajas"
+  #   agrupar_por: ["'Calendar'[Year]"]
+  #   referencia: { tipo: csv, archivo: origen/exports/cartera_evolucion.csv, columna: Bajas, renombrar: { "Año": "Year" } }
+
+  # Con filtros y referencia calculada desde un QVD local (solo agregados)
+  - id: cartera_emitidas_canal_2024
+    medida: "# Polizas Emitidas"
+    agrupar_por: ["dim_canal[Canal]"]
+    filtros: { "'Calendar'[Year]": [2024] }
+    referencia:
+      tipo: qvd
+      archivo: ../../datos-locales/Polizas.qvd   # fuera del repo (gitignore)
+      columna: NroPoliza
+      agregacion: count_distinct
+      filtros: { "AnioEmision": [2024] }
+      renombrar: { "CanalDesc": "Canal" }
+    tolerancia_pct: 0.5
+
+  # Consistencia interna (sin Qlik): stock final = stock inicial + emitidas - bajas
+  - id: cartera_identidad_stock
+    medida: "_Chk Stock"   # o usá "consulta:" con la consulta completa del destino
+    consulta: |
+      EVALUATE
+      ADDCOLUMNS(
+          VALUES('Calendar'[Year]),
+          "valor", [# Polizas Stock Final] - ([# Polizas Stock Inicial] + [# Polizas Emitidas] - [# Polizas Bajas])
+      )
+    agrupar_por: ["'Calendar'[Year]"]
+    referencia:
+      tipo: csv
+      archivo: tests/ceros_por_anio.csv   # columna Year;valor con 0 en cada año
+      columna: valor
+    tolerancia: 0
