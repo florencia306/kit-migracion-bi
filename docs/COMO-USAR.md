@@ -7,7 +7,7 @@ Editá `migracion.yaml` (origen y destino). Hoy: `qlik` → `powerbi`. Ver `docs
 Estructura: `tableros/<t>/` con el modelo del destino (PBIP), `qlik/` (qvw, qvd, source; no se sube), `origen/` (lo que extrae el kit) y `tests/casos.yaml`.
 
 - **Reporte con desvío por métrica** → agente **Reporte de migración** (o a mano):
-  0. `python scripts/herramientas/qlik_vivo.py extraer "tableros/<t>/qlik/<T>.qvw" tableros/<t>/origen`
+  0. `python scripts/herramientas/qlik_vivo.py extraer tableros/<t>/qlik/Frontend tableros/<t>/origen` (uno o varios .qvw)
   1. `python scripts/catalogo.py tableros/<t>/origen/expresiones.csv "tableros/<t>/<T>.SemanticModel" validacion/resultados/<t>`
   2. `python scripts/validar.py tableros/<t>/tests/casos.yaml`
   3. `python scripts/reporte.py validacion/resultados/<t> --titulo "Métricas <T>"` → abrir `reporte-migracion.html`

@@ -13,7 +13,7 @@ tableros:
   - id: cartera
     gerencia: individual        # ajustar
     base: true
-    qlik: "Cartera.qvw"
+    qlik: ["Cartera.qvw", "RealBudget.qvw"]   # dos Frontend unificados en un solo Power BI
     azdo_us: null
     alias: ["Cartera", "Tablero de Cartera"]
 

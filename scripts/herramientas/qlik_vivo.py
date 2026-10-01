@@ -7,19 +7,20 @@ abierto en QlikView; si no hay ninguno, abre el .qvw indicado (sin recargar dato
 
 Uso:
   # 1) Extraer hojas, objetos, expresiones, variables y script (una vez por tablero)
-  python scripts/herramientas/qlik_vivo.py extraer "tableros/<t>/qlik/<Tablero>.qvw" tableros/<t>/origen
+  #    Con la carpeta Frontend toma todos sus .qvw. Uno solo: IDs como CH05. Varios: Documento/CH05.
+  python scripts/herramientas/qlik_vivo.py extraer tableros/<t>/qlik/Frontend tableros/<t>/origen
 
   # 1b) Scripts de carga de TODOS los .qvw de la carpeta de QlikView (Descargar, Store, Frontend...)
   python scripts/herramientas/qlik_vivo.py scripts tableros/<t>/qlik tableros/<t>/origen/scripts
 
   # 2) Ver qué devuelve un objeto con un período (solo muestra un resumen; no imprime datos)
-  python scripts/herramientas/qlik_vivo.py datos "tableros/<t>/qlik/<Tablero>.qvw" CH05 --var vPeriodoReporte=202608 --sel "Año=2025,2026"
+  python scripts/herramientas/qlik_vivo.py datos tableros/<t>/qlik/Frontend CH05 --var vPeriodoReporte=202608 --sel "Año=2025,2026"
 
 Salida de "extraer" en la carpeta indicada:
   expresiones.csv  hoja;objeto;tipo;titulo;etiqueta;expresion   (lo lee catalogo.py)
   objetos.csv      hoja;objeto;tipo;titulo;dimensiones;expresiones
-  variables.csv    nombre;valor
-  script.qvs       script de carga (con credenciales ocultas)
+  variables.csv    nombre;valor   (con varios Frontend: documento;nombre;valor)
+  script.qvs       script de carga, con credenciales ocultas (varios: script_<Documento>.qvs)
 
 Requisito: pip install pywin32
 Nota: la API COM de QlikView cambia poco entre versiones, pero si algún dato no aparece,
@@ -132,16 +133,19 @@ def ocultar_credenciales(script):
     return re.sub(r"(?i)\b(pwd|password|xpassword|user id|uid)\s*=\s*[^;\"\]]*", r"\1=[oculto]", script)
 
 
-def extraer(doc, salida):
-    os.makedirs(salida, exist_ok=True)
+def recolectar(doc, prefijo=""):
+    """Objetos, expresiones, variables y script de un documento. Con prefijo (varios Frontend),
+    los IDs quedan 'Documento/CH05' y las hojas 'Documento · Hoja' para que no choquen."""
     filas, objetos = [], []
     n_hojas = _try(lambda: doc.NoOfSheets(), 0)
     for i in range(n_hojas):
         sh = doc.GetSheet(i)
         hoja = _v(_try(lambda: sh.GetProperties().Name, f"Hoja{i + 1}"))
+        hoja_p = f"{prefijo} · {hoja}" if prefijo else hoja
         for obj in _try(lambda: sh.GetSheetObjects(), [], f"objetos de {hoja}") or []:
             oid = _v(_try(lambda: obj.GetObjectId(), "")).split("\\")[-1]
             tipo, titulo = tipo_objeto(oid), titulo_de(obj)
+            oid_p = f"{prefijo}/{oid}" if prefijo else oid
             exprs = expresiones_de(obj) if tipo in ("grafico", "tabla simple") else []
             if tipo == "texto":
                 t = texto_de(obj)
@@ -149,32 +153,84 @@ def extraer(doc, salida):
                     exprs = [("texto", t)]
             dims = dimensiones_de(obj) if tipo == "grafico" else []
             for lab, d in exprs:
-                filas.append([hoja, oid, tipo, titulo, lab, d])
-            objetos.append([hoja, oid, tipo, titulo, " | ".join(dims), len(exprs)])
+                filas.append([hoja_p, oid_p, tipo, titulo, lab, d])
+            objetos.append([hoja_p, oid_p, tipo, titulo, " | ".join(dims), len(exprs)])
+    vars_ = []
+    vd = _try(lambda: doc.GetVariableDescriptions(), None, "variables")
+    for i in range(_try(lambda: vd.Count, 0) if vd is not None else 0):
+        nom = _try(lambda: vd.Item(i).Name, "")
+        vars_.append(([prefijo] if prefijo else []) + [nom, _try(lambda: doc.Variables(nom).GetRawContent(), "")])
+    script = _try(lambda: doc.GetScript(), "", "script")
+    return filas, objetos, vars_, script
+
+
+def documentos(fuentes):
+    """Rutas .qvw a partir de archivos y/o carpetas (p. ej. qlik/Frontend). Vacío = documento abierto."""
+    out = []
+    for f in fuentes or []:
+        if os.path.isdir(f):
+            out += sorted(glob.glob(os.path.join(f, "**", "*.qvw"), recursive=True))
+        else:
+            out.append(f)
+    return out
+
+
+def separar(objeto):
+    """'RealBudget/CH05' -> ('RealBudget', 'CH05');  'CH05' -> (None, 'CH05')"""
+    doc, _, oid = objeto.rpartition("/")
+    return (doc or None), oid
+
+
+def resolver_qvw(fuente, nombre_doc):
+    """Con varios Frontend: el .qvw cuyo nombre coincide con el prefijo del objeto."""
+    qvws = documentos([fuente]) if fuente else []
+    if not nombre_doc:
+        if len(qvws) > 1:
+            raise ValueError(f"Hay {len(qvws)} documentos en {fuente}: escribí el objeto como <Documento>/<ID>")
+        return qvws[0] if qvws else fuente
+    for q in qvws:
+        if os.path.splitext(os.path.basename(q))[0].lower() == nombre_doc.lower():
+            return q
+    raise ValueError(f"No encontré {nombre_doc}.qvw en {fuente}")
+
+
+def extraer(fuentes, salida):
+    os.makedirs(salida, exist_ok=True)
+    qvws = documentos(fuentes)
+    multi = len(qvws) > 1
+    filas, objetos, vars_, scripts = [], [], [], {}
+    for q in (qvws or [None]):
+        app, doc, propio = conectar(q)
+        nombre = os.path.splitext(os.path.basename(q or _v(doc.GetPathName())))[0]
+        try:
+            f, o, v, sc = recolectar(doc, nombre if multi else "")
+        finally:
+            if propio:
+                _try(lambda: doc.CloseDoc())
+        filas += f
+        objetos += o
+        vars_ += v
+        if sc:
+            scripts[nombre] = sc
+        if multi:
+            print(f"  {nombre}: objetos {len(o)} | expresiones {len(f)}")
 
     def escribir(nombre, cab, rows):
-        with open(os.path.join(salida, nombre), "w", newline="", encoding="utf-8-sig") as f:
-            w = csv.writer(f, delimiter=";")
+        with open(os.path.join(salida, nombre), "w", newline="", encoding="utf-8-sig") as fh:
+            w = csv.writer(fh, delimiter=";")
             w.writerow(cab)
             w.writerows(rows)
 
     escribir("expresiones.csv", ["hoja", "objeto", "tipo", "titulo", "etiqueta", "expresion"], filas)
     escribir("objetos.csv", ["hoja", "objeto", "tipo", "titulo", "dimensiones", "expresiones"], objetos)
-
-    vars_ = []
-    vd = _try(lambda: doc.GetVariableDescriptions(), None, "variables")
-    for i in range(_try(lambda: vd.Count, 0) if vd is not None else 0):
-        nom = _try(lambda: vd.Item(i).Name, "")
-        val = _try(lambda: doc.Variables(nom).GetRawContent(), "")
-        vars_.append([nom, val])
-    escribir("variables.csv", ["nombre", "valor"], vars_)
-
-    script = _try(lambda: doc.GetScript(), "", "script")
-    if script:
-        open(os.path.join(salida, "script.qvs"), "w", encoding="utf-8").write(ocultar_credenciales(script))
+    escribir("variables.csv", (["documento"] if multi else []) + ["nombre", "valor"], vars_)
+    for nombre, sc in scripts.items():
+        archivo = f"script_{nombre}.qvs" if multi else "script.qvs"
+        open(os.path.join(salida, archivo), "w", encoding="utf-8").write(ocultar_credenciales(sc))
 
     hojas = len({f[0] for f in objetos})
-    print(f"Hojas: {hojas} | objetos: {len(objetos)} | expresiones: {len(filas)} | variables: {len(vars_)} | script: {'sí' if script else 'no'}")
+    docs = f"documentos: {len(qvws)} | " if multi else ""
+    print(f"{docs}Hojas: {hojas} | objetos: {len(objetos)} | expresiones: {len(filas)} | variables: {len(vars_)} | script: {'sí' if scripts else 'no'}")
     print(f"-> {salida}")
 
 
@@ -281,11 +337,11 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("extraer")
-    e.add_argument("qvw", nargs="?")
+    e.add_argument("fuentes", nargs="*", help=".qvw o carpeta Frontend (todos sus .qvw). Vacío = documento abierto")
     e.add_argument("salida")
     d = sub.add_parser("datos")
-    d.add_argument("qvw")
-    d.add_argument("objeto")
+    d.add_argument("qvw", help=".qvw o carpeta Frontend")
+    d.add_argument("objeto", help="CH05, o Documento/CH05 si hay varios Frontend")
     d.add_argument("--var", action="append")
     d.add_argument("--sel", action="append")
     d.add_argument("--guardar", help="CSV local (fuera del repo) con el resultado")
@@ -300,20 +356,23 @@ def main():
         if _avisos:
             print(f"Avisos ({len(_avisos)}): " + " · ".join(_avisos[:5]))
         return
-    app, doc, propio = conectar(a.qvw)
+    if a.cmd == "extraer":
+        extraer(a.fuentes, a.salida)
+        if _avisos:
+            print(f"Avisos ({len(_avisos)}): " + " · ".join(_avisos[:5]))
+        return
+    nombre_doc, oid = separar(a.objeto)
+    app, doc, propio = conectar(resolver_qvw(a.qvw, nombre_doc))
     try:
-        if a.cmd == "extraer":
-            extraer(doc, a.salida)
-        else:
-            orig = aplicar_contexto(doc, _kv(a.var), _kv(a.sel, lista=True))
-            try:
-                df = datos_objeto(doc, a.objeto)
-            finally:
-                restaurar(doc, orig)
-            print(f"{a.objeto}: {len(df)} filas | columnas: {', '.join(map(str, df.columns))}")
-            if a.guardar:
-                df.to_csv(a.guardar, sep=";", index=False, encoding="utf-8-sig")
-                print(f"-> {a.guardar}")
+        orig = aplicar_contexto(doc, _kv(a.var), _kv(a.sel, lista=True))
+        try:
+            df = datos_objeto(doc, oid)
+        finally:
+            restaurar(doc, orig)
+        print(f"{a.objeto}: {len(df)} filas | columnas: {', '.join(map(str, df.columns))}")
+        if a.guardar:
+            df.to_csv(a.guardar, sep=";", index=False, encoding="utf-8-sig")
+            print(f"-> {a.guardar}")
     finally:
         if propio:
             _try(lambda: doc.CloseDoc())

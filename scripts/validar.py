@@ -81,20 +81,25 @@ def ref_sql(ref, base_dir, keys):
         return pd.read_sql(ref["consulta"], cn)
 
 
-_QLIK = {}
+_QLIK = {}   # una conexión por documento: ruta -> (doc, abierto_por_nosotros)
 
 
 def ref_qlik(ref, base_dir, keys):
-    """Valor leído en vivo de un objeto de QlikView, con variables y selecciones del caso."""
+    """Valor leído en vivo de un objeto de QlikView, con variables y selecciones del caso.
+    documento: un .qvw o la carpeta Frontend; con varios Frontend, objeto: Documento/CH05."""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "herramientas"))
     import qlik_vivo
-    if "doc" not in _QLIK:
-        qvw = ref.get("documento")
-        _QLIK["app"], _QLIK["doc"], _QLIK["propio"] = qlik_vivo.conectar(os.path.join(base_dir, qvw) if qvw else None)
-    doc = _QLIK["doc"]
+    nombre_doc, oid = qlik_vivo.separar(str(ref["objeto"]))
+    fuente = os.path.join(base_dir, ref["documento"]) if ref.get("documento") else None
+    qvw = qlik_vivo.resolver_qvw(fuente, nombre_doc) if fuente else None
+    clave = os.path.abspath(qvw) if qvw else "activo"
+    if clave not in _QLIK:
+        _, doc, propio = qlik_vivo.conectar(qvw)
+        _QLIK[clave] = (doc, propio)
+    doc = _QLIK[clave][0]
     orig = qlik_vivo.aplicar_contexto(doc, ref.get("variables"), ref.get("selecciones"))
     try:
-        df = qlik_vivo.datos_objeto(doc, ref["objeto"])
+        df = qlik_vivo.datos_objeto(doc, oid)
     finally:
         qlik_vivo.restaurar(doc, orig)
     df = df.rename(columns=ref.get("renombrar", {}))
@@ -106,11 +111,12 @@ def ref_qlik(ref, base_dir, keys):
 
 
 def cerrar_qlik():
-    if _QLIK.get("propio"):
-        try:
-            _QLIK["doc"].CloseDoc()
-        except Exception:
-            pass
+    for doc, propio in _QLIK.values():
+        if propio:
+            try:
+                doc.CloseDoc()
+            except Exception:
+                pass
 
 
 REF = {"csv": ref_csv, "qvd": ref_qvd, "sql": ref_sql, "qlik": ref_qlik}

@@ -15,5 +15,5 @@ validacion/resultados/**/detalle_*.csv
 gestion/*.csv
 # Carpeta de QlikView del tablero (qvw, qvd, scripts con conexiones): solo local
 tableros/*/qlik/
-tableros/*/origen/script.qvs
+tableros/*/origen/script*.qvs
 tableros/*/origen/scripts/

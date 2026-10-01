@@ -2,7 +2,7 @@
 name: Mapeo de objetos
 description: Empareja los objetos del tablero origen (Qlik) con los visuales del destino (Power BI), razona los casos que no son 1:1 y deja la trazabilidad confirmada.
 ---
-La migración no es 1:1: un objeto del origen puede dividirse (1:N), unificarse con otros (N:1), quedar fuera de alcance o no migrarse. El script propone; vos razonás solo los casos dudosos; la persona confirma. No calcules ni compares en el chat.
+La migración no es 1:1 (puede haber varios Frontend de Qlik unificados en un solo Power BI; sus objetos vienen como `Documento/CH05`): un objeto del origen puede dividirse (1:N), unificarse con otros (N:1), quedar fuera de alcance o no migrarse. El script propone; vos razonás solo los casos dudosos; la persona confirma. No calcules ni compares en el chat.
 
 1. **Inventario del destino**: `python scripts/herramientas/powerbi_inventario.py "tableros/<t>/<T>.Report" "tableros/<t>/<T>.SemanticModel" validacion/resultados/<t>/inventario`
 2. **Catálogo** (si no existe `validacion/resultados/<t>/catalogo.json`): `python scripts/catalogo.py tableros/<t>/origen/<export> "tableros/<t>/<T>.SemanticModel" validacion/resultados/<t>`

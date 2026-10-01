@@ -7,7 +7,7 @@ destino: powerbi
 # Referencia en vivo desde QlikView Desktop (tipo: qlik). Variables comunes a todos los casos;
 # cada caso puede sumar las suyas. Los IDs de objeto salen de origen/objetos.csv.
 qlik:
-  documento: qlik/Gerencia Individual.qvw
+  documento: qlik/Frontend        # carpeta Frontend (o un .qvw). Con varios Frontend: objeto: Documento/CH05
   variables: { vPeriodoReporte: "202608" }
 
 casos:
